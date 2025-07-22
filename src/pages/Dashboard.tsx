@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { ServerCard } from "@/components/ServerCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,66 +14,72 @@ import {
   TrendingUp, 
   Activity,
   Plus,
-  Filter
+  Filter,
+  Loader2
 } from "lucide-react";
-
-// Mock server data - replace with real API calls
-const mockServers = [
-  {
-    id: "123456789",
-    name: "Gaming Paradise",
-    icon: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=100&h=100&fit=crop&crop=center",
-    memberCount: 1250,
-    isOwner: true,
-    hasManageGuild: true,
-    botInServer: true
-  },
-  {
-    id: "987654321", 
-    name: "Study Group",
-    icon: null,
-    memberCount: 45,
-    isOwner: false,
-    hasManageGuild: true,
-    botInServer: true
-  },
-  {
-    id: "456789123",
-    name: "Art Community Hub",
-    icon: "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=100&h=100&fit=crop&crop=center",
-    memberCount: 890,
-    isOwner: false,
-    hasManageGuild: false,
-    botInServer: false
-  },
-  {
-    id: "789123456",
-    name: "Tech Talk Central",
-    icon: null,
-    memberCount: 2100,
-    isOwner: true,
-    hasManageGuild: true,
-    botInServer: true
-  }
-];
+import { isLoggedIn, getUserGuilds, inviteBot, Guild } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export function Dashboard() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTab, setSelectedTab] = useState("all");
-  const [servers, setServers] = useState(mockServers);
+  const [servers, setServers] = useState<Guild[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      navigate('/');
+      return;
+    }
+
+    loadGuilds();
+  }, [navigate]);
+
+  const loadGuilds = async () => {
+    try {
+      setLoading(true);
+      const guilds = await getUserGuilds();
+      setServers(guilds);
+    } catch (error) {
+      console.error('Failed to load guilds:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load your servers",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 flex items-center justify-center">
+        <Card className="card-gradient">
+          <CardContent className="p-8 text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+            <h2 className="text-xl font-semibold">Loading your servers...</h2>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const filteredServers = servers.filter(server => {
     const matchesSearch = server.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const hasManageGuild = server.owner || (parseInt(server.permissions) & 32) === 32;
     
     switch (selectedTab) {
       case "managed":
-        return matchesSearch && server.hasManageGuild;
+        return matchesSearch && hasManageGuild;
       case "owned":
-        return matchesSearch && server.isOwner;
+        return matchesSearch && server.owner;
       case "bot-added":
-        return matchesSearch && server.botInServer;
+        return matchesSearch && server.hasBot;
       case "bot-missing":
-        return matchesSearch && !server.botInServer;
+        return matchesSearch && !server.hasBot;
       default:
         return matchesSearch;
     }
@@ -80,14 +87,14 @@ export function Dashboard() {
 
   const stats = {
     totalServers: servers.length,
-    managedServers: servers.filter(s => s.hasManageGuild).length,
-    ownedServers: servers.filter(s => s.isOwner).length,
-    botServers: servers.filter(s => s.botInServer).length,
-    totalMembers: servers.reduce((acc, server) => acc + server.memberCount, 0)
+    managedServers: servers.filter(s => s.owner || (parseInt(s.permissions) & 32) === 32).length,
+    ownedServers: servers.filter(s => s.owner).length,
+    botServers: servers.filter(s => s.hasBot).length,
+    totalMembers: servers.reduce((acc, server) => acc + (server.memberCount || 0), 0)
   };
 
   const handleInviteBot = () => {
-    window.open('https://discord.com/oauth2/authorize?client_id=934456688306683925&permissions=1099511627775&response_type=code&redirect_uri=https%3A%2F%2Ftryhard-dashboard.vercel.app%2Fdiscordlogin&integration_type=0&scope=guilds+identify+bot+applications.commands', '_blank');
+    inviteBot();
   };
 
   return (

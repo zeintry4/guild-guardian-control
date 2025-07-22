@@ -1,30 +1,25 @@
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Users, Crown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Settings, Users, Crown, Bot, ExternalLink } from "lucide-react";
+import { Guild, inviteBot } from "@/lib/api";
 
 interface ServerCardProps {
-  server: {
-    id: string;
-    name: string;
-    icon?: string;
-    memberCount: number;
-    isOwner: boolean;
-    hasManageGuild: boolean;
-    botInServer: boolean;
-  };
+  server: Guild;
 }
 
 export function ServerCard({ server }: ServerCardProps) {
-  const getServerIcon = () => {
-    if (server.icon) {
-      return server.icon;
-    }
-    // Generate a color based on server name for consistent placeholder
-    const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-yellow-500'];
-    const index = server.name.length % colors.length;
-    return colors[index];
+  const navigate = useNavigate();
+  const canManage = server.owner || (parseInt(server.permissions) & 32) === 32;
+
+  const handleManageServer = () => {
+    navigate(`/server/${server.id}`);
+  };
+
+  const handleInviteBot = () => {
+    inviteBot(server.id);
   };
 
   return (
@@ -32,72 +27,79 @@ export function ServerCard({ server }: ServerCardProps) {
       <CardContent className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3">
-            {server.icon ? (
-              <img
-                src={server.icon}
-                alt={server.name}
-                className="h-12 w-12 rounded-full object-cover"
-              />
-            ) : (
-              <div className={`h-12 w-12 rounded-full ${getServerIcon()} flex items-center justify-center text-white font-bold text-lg`}>
+            <Avatar className="h-12 w-12">
+              <AvatarImage src={server.icon || ""} />
+              <AvatarFallback className="bg-primary/10 text-primary font-semibold">
                 {server.name.charAt(0).toUpperCase()}
-              </div>
-            )}
+              </AvatarFallback>
+            </Avatar>
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-lg truncate">{server.name}</h3>
               <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                 <Users className="h-4 w-4" />
-                <span>{server.memberCount.toLocaleString()} members</span>
-                {server.isOwner && (
-                  <Badge variant="secondary" className="ml-2">
-                    <Crown className="h-3 w-3 mr-1" />
-                    Owner
-                  </Badge>
-                )}
+                <span>{(server.memberCount || 0).toLocaleString()} members</span>
               </div>
             </div>
           </div>
-          
-          <div className="flex flex-col space-y-1">
-            <Badge 
-              variant={server.botInServer ? "default" : "destructive"}
-              className={server.botInServer ? "bg-green-500 hover:bg-green-600" : ""}
-            >
-              {server.botInServer ? "Bot Added" : "Add Bot"}
-            </Badge>
-          </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            {server.hasManageGuild && (
-              <Badge variant="outline" className="text-xs">
-                Can Manage
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {server.owner && (
+              <Badge variant="secondary" className="text-xs">
+                <Crown className="h-3 w-3 mr-1" />
+                Owner
               </Badge>
             )}
+            
+            {canManage && !server.owner && (
+              <Badge variant="outline" className="text-xs">
+                <Settings className="h-3 w-3 mr-1" />
+                Manager
+              </Badge>
+            )}
+            
+            <Badge 
+              variant={server.hasBot ? "default" : "destructive"} 
+              className="text-xs"
+            >
+              <Bot className="h-3 w-3 mr-1" />
+              {server.hasBot ? "Bot Added" : "No Bot"}
+            </Badge>
           </div>
-          
+
           <div className="flex space-x-2">
-            {!server.botInServer ? (
+            {canManage && server.hasBot && (
               <Button 
                 size="sm" 
-                onClick={() => {
-                  // Mock invite bot logic
-                  window.open(`https://discord.com/oauth2/authorize?client_id=934456688306683925&permissions=1099511627775&guild_id=${server.id}&response_type=code&redirect_uri=https%3A%2F%2Ftryhard-dashboard.vercel.app%2Fdiscordlogin&integration_type=0&scope=guilds+identify+bot+applications.commands`, '_blank');
-                }}
-                className="glow-primary"
+                className="flex-1"
+                onClick={handleManageServer}
               >
-                Invite Bot
+                <Settings className="h-4 w-4 mr-2" />
+                Manage
               </Button>
-            ) : (
-              server.hasManageGuild && (
-                <Link to={`/servers/${server.id}/settings`}>
-                  <Button size="sm" variant="outline" className="hover-glow">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Manage
-                  </Button>
-                </Link>
-              )
+            )}
+            
+            {!server.hasBot && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="flex-1"
+                onClick={handleInviteBot}
+              >
+                <Bot className="h-4 w-4 mr-2" />
+                Add Bot
+              </Button>
+            )}
+            
+            {server.hasBot && (
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={() => window.open(`https://discord.com/channels/${server.id}`, '_blank')}
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
             )}
           </div>
         </div>

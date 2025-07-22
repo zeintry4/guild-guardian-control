@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
@@ -11,18 +11,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Settings, LogOut, User, Menu, X } from "lucide-react";
 import botAvatar from "@/assets/bot-avatar.png";
-
-// Mock user data - replace with real auth
-const mockUser = {
-  name: "User",
-  avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face",
-  discriminator: "1234"
-};
+import { isLoggedIn, getCurrentUser, login, logout } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
-  const isLoggedIn = location.pathname.includes('/dashboard') || location.pathname.includes('/servers');
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const userLoggedIn = isLoggedIn();
+  const user = getCurrentUser();
 
   const navItems = [
     { name: "Home", href: "/" },
@@ -36,13 +34,16 @@ export function Navbar() {
   ];
 
   const handleLogin = () => {
-    // Mock login - replace with real Discord OAuth
-    window.location.href = '/dashboard';
+    login();
   };
 
   const handleLogout = () => {
-    // Mock logout - replace with real logout logic
-    window.location.href = '/';
+    logout();
+    toast({
+      title: "Logged out",
+      description: "You have been successfully logged out"
+    });
+    navigate('/');
   };
 
   return (
@@ -59,7 +60,7 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6">
-            {isLoggedIn ? (
+          {userLoggedIn ? (
               dashboardItems.map((item) => (
                 <Link
                   key={item.name}
@@ -92,31 +93,31 @@ export function Navbar() {
 
           {/* User Actions */}
           <div className="hidden md:flex items-center space-x-4">
-            {isLoggedIn ? (
+            {userLoggedIn ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full hover-glow">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={mockUser.avatar} alt={mockUser.name} />
-                      <AvatarFallback>{mockUser.name.slice(0, 2)}</AvatarFallback>
+                      <AvatarImage src={user?.avatar || ""} alt={user?.username || "User"} />
+                      <AvatarFallback>{user?.username?.slice(0, 2).toUpperCase() || "U"}</AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <div className="flex items-center justify-start gap-2 p-2">
                     <div className="flex flex-col space-y-1 leading-none">
-                      <p className="font-medium">{mockUser.name}</p>
+                      <p className="font-medium">{user?.username || "User"}</p>
                       <p className="text-xs text-muted-foreground">
-                        #{mockUser.discriminator}
+                        #{user?.discriminator || "0000"}
                       </p>
                     </div>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/dashboard')}>
                     <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
+                    <span>Dashboard</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem disabled>
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
                   </DropdownMenuItem>
@@ -150,7 +151,7 @@ export function Navbar() {
         {isMenuOpen && (
           <div className="md:hidden border-t border-border/40 bg-background/95 backdrop-blur">
             <div className="space-y-1 px-2 pt-2 pb-3">
-              {(isLoggedIn ? dashboardItems : navItems).map((item) => (
+              {(userLoggedIn ? dashboardItems : navItems).map((item) => (
                 <Link
                   key={item.name}
                   to={item.href}
@@ -161,16 +162,16 @@ export function Navbar() {
                 </Link>
               ))}
               <div className="px-3 py-2">
-                {isLoggedIn ? (
+                {userLoggedIn ? (
                   <div className="space-y-2">
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={mockUser.avatar} alt={mockUser.name} />
-                        <AvatarFallback>{mockUser.name.slice(0, 2)}</AvatarFallback>
+                        <AvatarImage src={user?.avatar || ""} alt={user?.username || "User"} />
+                        <AvatarFallback>{user?.username?.slice(0, 2).toUpperCase() || "U"}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">{mockUser.name}</p>
-                        <p className="text-xs text-muted-foreground">#{mockUser.discriminator}</p>
+                        <p className="font-medium">{user?.username || "User"}</p>
+                        <p className="text-xs text-muted-foreground">#{user?.discriminator || "0000"}</p>
                       </div>
                     </div>
                     <Button variant="outline" onClick={handleLogout} className="w-full">
